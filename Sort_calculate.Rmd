@@ -9,8 +9,6 @@ knitr::opts_chunk$set(echo = TRUE)
 library(MASS)
 library(ggplot2)
 library(plotly)
-library(dplyr)
-library(reshape2)
 library(googlesheets)
 ```
 
@@ -32,7 +30,11 @@ Using the outer and vectorize functions, we can count the coccurances of each pi
 
 ```{r calculate}
 response.matrix<-outer(responses_read, responses_read, Vectorize(function(x, y) sum(x == y)))
+```
 
+isoMDS can use multidimensional scaling to represent all pictures in 2d space.
+
+```{r model}
 #Create fit from sample data
 item.dist<-dist(response.matrix)
 fit<-isoMDS(item.dist,k=2)
@@ -43,7 +45,11 @@ x <- fit$points[,1]
 y <- fit$points[,2]
 plot(x, y)
 text(x, y, labels = row.names(response.matrix), cex=.7)
+```
 
+K means and hierarchical clustering can create clusters based on the xy coordinates provided by MDS.
+
+```{r cluster}
 #kmeans
 dist.sample<-data.frame(cbind(x,y))
 cluster.sample<-kmeans(dist.sample,2)
@@ -66,13 +72,3 @@ print_clusters<-function(labels,k) {
 }
 print_clusters(groups,8)
 ```
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
