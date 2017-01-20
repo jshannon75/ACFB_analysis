@@ -1,0 +1,78 @@
+---
+title: "Untitled"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(MASS)
+library(ggplot2)
+library(plotly)
+library(dplyr)
+library(reshape2)
+library(googlesheets)
+```
+
+## Downloading data 
+
+We can begin by downloading data from the Google Drive responses, using the googlesheets plugin. The gs_ls function prompts us to authenticate with Google. The spreadsheet is then downloaded based on URL, and then we rename column headings and add an ID.
+
+```{r download}
+gs_ls()
+responses<-gs_url("https://docs.google.com/spreadsheets/d/1E31U5SN7_FpHHlKsuPR02f0KIVSyWgLKeXho_lzGCzk/edit?usp=sharing")
+responses_read<-gs_read(responses)
+names(responses_read)<-c("Time","Pic1","Pic2","Pic3","Pic4","Pic5")
+responses_read<-responses_read[,-1]
+```
+
+##Calculating co-occurances
+
+Using the outer and vectorize functions, we can count the coccurances of each picture in the responses.
+
+```{r calculate}
+response.matrix<-outer(responses_read, responses_read, Vectorize(function(x, y) sum(x == y)))
+
+#Create fit from sample data
+item.dist<-dist(response.matrix)
+fit<-isoMDS(item.dist,k=2)
+fit
+
+# plot solution 
+x <- fit$points[,1]
+y <- fit$points[,2]
+plot(x, y)
+text(x, y, labels = row.names(response.matrix), cex=.7)
+
+#kmeans
+dist.sample<-data.frame(cbind(x,y))
+cluster.sample<-kmeans(dist.sample,2)
+cluster.sample$cluster <- as.factor(cluster.sample$cluster)
+plot<-ggplot(dist.sample, aes(x, y, color = cluster.sample$cluster)) + geom_point(size=10)
+ggplotly(plot)
+
+#hierarchical cluster
+mds.dist<-dist(dist.sample)
+hc<-hclust(mds.dist) 
+plot(hc)
+groups<-cutree(hc,k=8)
+
+#Print HCA clusters (function from Practical Data Science in R)
+print_clusters<-function(labels,k) {
+  for(i in 1:k) {
+    print(paste("cluster",i))
+    print(SampleData1[labels==i,c("Type","Score")])
+  }
+}
+print_clusters(groups,8)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
