@@ -20,8 +20,8 @@ We can begin by downloading data from the Google Drive responses, using the goog
 gs_ls()
 responses<-gs_url("https://docs.google.com/spreadsheets/d/1E31U5SN7_FpHHlKsuPR02f0KIVSyWgLKeXho_lzGCzk/edit?usp=sharing")
 responses_read<-gs_read(responses)
-names(responses_read)<-c("Time","Pic1","Pic2","Pic3","Pic4","Pic5")
 responses_read<-responses_read[,-1]
+names(responses_read)<-c("Pic1","Pic2","Pic3","Pic4","Pic5")
 ```
 
 ##Calculating co-occurances
