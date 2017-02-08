@@ -17,11 +17,16 @@ library(googlesheets)
 We can begin by downloading data from the Google Drive responses, using the googlesheets plugin. The gs_ls function prompts us to authenticate with Google. The spreadsheet is then downloaded based on URL, and then we rename column headings and add an ID.
 
 ```{r download}
-gs_ls()
-responses<-gs_url("https://docs.google.com/spreadsheets/d/1E31U5SN7_FpHHlKsuPR02f0KIVSyWgLKeXho_lzGCzk/edit?usp=sharing")
+#gs_ls()
+responses<-gs_url("https://docs.google.com/spreadsheets/d/1FdLMBZkQzTdd71qx33OgrC4Tc6Af5JCkQR4b8k8T0Xk/edit?usp=sharing")
 responses_read<-gs_read(responses)
-responses_read<-responses_read[,-1]
-names(responses_read)<-c("Pic1","Pic2","Pic3","Pic4","Pic5")
+responses_read1<-responses_read[,3:26] #Select just the sort for similarity
+
+#Create picture names as headers
+n_pics<-1:24
+picnames<-merge("pic",n_pics)
+picnames$names<-paste(picnames$x,picnames$y,sep="")
+names(responses_read1)<-picnames$names
 ```
 
 ##Calculating co-occurances
@@ -29,14 +34,15 @@ names(responses_read)<-c("Pic1","Pic2","Pic3","Pic4","Pic5")
 Using the outer and vectorize functions, we can count the coccurances of each picture in the responses.
 
 ```{r calculate}
-response.matrix<-outer(responses_read, responses_read, Vectorize(function(x, y) sum(x == y)))
+response.matrix<-outer(responses_read1, responses_read1, Vectorize(function(x, y) sum(x == y)))
 ```
 
 isoMDS can use multidimensional scaling to represent all pictures in 2d space.
 
 ```{r model}
 #Create fit from sample data
-item.dist<-dist(response.matrix)
+item.dist<-dist(response.matrix, method="euclidean")
+item.dist[item.dist==0]<-1
 fit<-isoMDS(item.dist,k=2)
 fit
 
@@ -52,23 +58,48 @@ K means and hierarchical clustering can create clusters based on the xy coordina
 ```{r cluster}
 #kmeans
 dist.sample<-data.frame(cbind(x,y))
-cluster.sample<-kmeans(dist.sample,2)
+cluster.sample<-kmeans(dist.sample,6)
 cluster.sample$cluster <- as.factor(cluster.sample$cluster)
-plot<-ggplot(dist.sample, aes(x, y, color = cluster.sample$cluster)) + geom_point(size=10)
+cplot<-ggplot(dist.sample, aes(x, y, color = cluster.sample$cluster)) + geom_point(size=10)
 ggplotly(plot)
+dist.sample.cluster<-cbind(dist.sample,cluster.sample$cluster)
 
-#hierarchical cluster
-mds.dist<-dist(dist.sample)
-hc<-hclust(mds.dist) 
+#hierarchical cluster method
+hc<-hclust(item.dist, method="ward.D") #Calculate the distance using hierarchical clustering with Ward's method
 plot(hc)
-groups<-cutree(hc,k=8)
+rect.hclust(hc,k=7) #Add rectangles for the clusters
 
-#Print HCA clusters (function from Practical Data Science in R)
-print_clusters<-function(labels,k) {
-  for(i in 1:k) {
-    print(paste("cluster",i))
-    print(SampleData1[labels==i,c("Type","Score")])
-  }
-}
-print_clusters(groups,8)
+#Extract clusters from the groups and create a data frame showing the groups
+hc.groups<-data.frame(cutree(hc,k=7))
+hc.groups$pic<-row.names(hc.groups)
+hc.groups<-hc_groups[,c(2,1)]
+names(hc.groups)<-c("picgroup","pic")
+
+```
+
+We can use the ranked importance of these issues to prioritize groups. 
+
+```{r}
+#Read in importance responses
+pic.important<-data.frame(t(responses_read[,33:56]),stringsAsFactors=FALSE)
+
+#Change responses to numeric Likert score values
+pic.important[pic.important=="Most important"]<-3
+pic.important[pic.important=="Middle group"]<-2
+pic.important[pic.important=="Not important"]<-1
+pic.important$rank1<-as.numeric(pic.important$X1)
+pic.important$rank2<-as.numeric(pic.important$X2)
+pic.important$rank3<-as.numeric(pic.important$X3)
+pic.important$rank4<-as.numeric(pic.important$X4)
+pic.important$rank5<-as.numeric(pic.important$X5)
+pic.important$rank6<-as.numeric(pic.important$X6)
+pic.important<-pic.important[,7:12]
+
+#Create an average importance score
+pic.important$means<-rowMeans(pic.important,na.rm=TRUE)
+
+#Average group scores
+hc.groups1<-cbind(hc.groups,pic.important$means)
+aggregate(hc.groups1[,3],list(Group=hc.groups1$picgroup),mean)
+
 ```
